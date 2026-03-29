@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoanLens — See Through the Fine Print</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060608;
+  --surface: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.08);
+  --border-bright: rgba(255,255,255,0.18);
+  --text: #f0eee8;
+  --muted: rgba(240,238,232,0.42);
+  --red: #ff3b3b;
+  --red-dim: rgba(255,59,59,0.10);
+  --amber: #f5a623;
+  --amber-dim: rgba(245,166,35,0.10);
+  --cyan: #00e5c8;
+  --cyan-dim: rgba(0,229,200,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden;cursor:none;}
+
+.cursor{width:9px;height:9px;background:var(--text);border-radius:50%;position:fixed;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .12s,background .2s;}
+.cursor-ring{width:34px;height:34px;border:1px solid rgba(240,238,232,0.28);border-radius:50%;position:fixed;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .3s,height .3s,border-color .2s;}
+body:has(a:hover) .cursor,body:has(button:hover) .cursor{transform:translate(-50%,-50%) scale(0);}
+body:has(a:hover) .cursor-ring,body:has(button:hover) .cursor-ring{width:52px;height:52px;border-color:var(--red);}
+
+#bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.5;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:20px 48px;border-bottom:1px solid var(--border);background:rgba(6,6,8,.8);backdrop-filter:blur(20px);animation:navIn .9s ease .1s both;}
+@keyframes navIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;display:flex;align-items:center;gap:9px;}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 2s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.55)}}
+.privacy-btn{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--cyan);border:1px solid rgba(0,229,200,.25);border-radius:20px;padding:6px 14px;cursor:pointer;background:none;display:flex;align-items:center;gap:6px;transition:all .2s;}
+.privacy-btn:hover{background:rgba(0,229,200,.08);border-color:rgba(0,229,200,.5);}
+.privacy-btn::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pulse 1.8s ease infinite;}
+
+/* SCREENS */
+.screen{display:none;position:relative;z-index:10;}
+.screen.active{display:block;}
+#heroScreen.active{display:flex;flex-direction:column;}
+#scanScreen.active{display:flex;align-items:center;justify-content:center;}
+
+/* PRIVACY OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;display:none;align-items:center;justify-content:center;backdrop-filter:blur(10px);}
+.overlay.open{display:flex;}
+.modal{background:#0d0d14;border:1px solid var(--border-bright);border-radius:20px;padding:40px;max-width:500px;width:90%;animation:fadeUp .35s ease;}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:2px;margin-bottom:4px;}
+.modal-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:2px;margin-bottom:24px;}
+.modal-item{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);}
+.modal-item:last-of-type{border-bottom:none;}
+.modal-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+.modal-text strong{display:block;font-size:13px;font-weight:500;margin-bottom:2px;}
+.modal-text p{font-size:12px;color:var(--muted);line-height:1.6;}
+.modal-close{width:100%;margin-top:22px;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;cursor:pointer;}
+.modal-close:hover{background:#d4d2cc;}
+
+/* HERO */
+#heroScreen{min-height:100vh;justify-content:center;padding:110px 48px 80px;overflow:hidden;}
+.hero-eyebrow{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--red);text-transform:uppercase;margin-bottom:24px;animation:fadeUp .8s ease .3s both;display:flex;align-items:center;gap:10px;}
+.hero-eyebrow::before{content:'';width:28px;height:1px;background:var(--red);}
+.hero-headline{font-family:'Bebas Neue',sans-serif;font-size:clamp(70px,11vw,165px);line-height:.92;letter-spacing:2px;}
+.hl{display:block;overflow:hidden;}
+.hl span{display:block;animation:slideUp .85s cubic-bezier(.16,1,.3,1) both;}
+.hl:nth-child(1) span{animation-delay:.4s;}
+.hl:nth-child(2) span{animation-delay:.55s;color:var(--red);}
+.hl:nth-child(3) span{animation-delay:.7s;}
+@keyframes slideUp{from{transform:translateY(110%)}to{transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.hero-sub{font-size:15px;color:var(--muted);line-height:1.85;max-width:400px;margin-top:36px;font-weight:300;animation:fadeUp .8s ease .9s both;}
+.hero-sub strong{color:var(--text);font-weight:500;}
+
+/* CARD */
+.card{position:absolute;right:48px;top:50%;transform:translateY(-50%);width:390px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:36px;backdrop-filter:blur(20px);animation:cardIn .9s cubic-bezier(.16,1,.3,1) .8s both;transition:border-color .3s;}
+.card:hover{border-color:var(--border-bright);}
+@keyframes cardIn{from{opacity:0;transform:translateY(-44%) scale(.95)}to{opacity:1;transform:translateY(-50%) scale(1)}}
+.card-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:18px;}
+
+/* TABS */
+.tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:18px;}
+.tab{flex:1;padding:9px 0;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s;text-transform:uppercase;}
+.tab.active{background:var(--text);color:var(--bg);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* UPLOAD */
+.drop-zone{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:32px 16px;text-align:center;cursor:pointer;position:relative;overflow:hidden;transition:all .22s;background:rgba(255,255,255,.02);}
+.drop-zone:hover{border-color:var(--red);background:var(--red-dim);}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-zone-icon{font-size:28px;margin-bottom:10px;}
+.drop-zone h3{font-size:13px;font-weight:500;margin-bottom:4px;}
+.drop-zone p{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.drop-zone::before{content:'';position:absolute;inset:-1px;border-radius:12px;background:conic-gradient(from var(--a,0deg),transparent 270deg,var(--red) 360deg);animation:spin 3s linear infinite;-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;opacity:0;transition:opacity .3s;}
+.drop-zone:hover::before{opacity:1;}
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false;}
+@keyframes spin{to{--a:360deg;}}
+
+/* MANUAL FORM */
+.form{display:flex;flex-direction:column;gap:9px;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fg label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.fg input,.fg select{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:7px;padding:9px 10px;font-family:'DM Mono',monospace;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;}
+.fg input:focus,.fg select:focus{border-color:var(--cyan);}
+.fg select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(240,238,232,.35)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
+.fg select option{background:#16161e;}
+.btn-go{width:100%;margin-top:4px;padding:13px;background:var(--red);color:#fff;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;letter-spacing:.5px;}
+.btn-go:hover{background:#e02020;transform:translateY(-1px);}
+
+/* DEMO LIST */
+.or{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;}
+.or::before,.or::after{content:'';flex:1;height:1px;background:var(--border);}
+.demos{display:flex;flex-direction:column;gap:7px;}
+.demo-btn{display:flex;align-items:center;gap:11px;padding:11px 14px;background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:9px;cursor:pointer;transition:all .18s;text-align:left;font-family:'DM Sans',sans-serif;color:var(--text);border-left-width:3px;}
+.demo-btn:hover{background:rgba(255,255,255,.07);transform:translateX(3px);}
+.demo-btn.r{border-left-color:var(--red);}
+.demo-btn.a{border-left-color:var(--amber);}
+.demo-btn.c{border-left-color:var(--cyan);}
+.demo-icon{font-size:17px;flex-shrink:0;}
+.demo-text strong{display:block;font-weight:500;font-size:12px;}
+.demo-text span{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+
+/* SCAN SCREEN */
+#scanScreen{min-height:100vh;padding:100px 48px 80px;}
+.scan-wrap{max-width:600px;width:100%;}
+.scan-frame{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);margin-bottom:26px;background:rgba(255,255,255,.03);}
+#scanImg{width:100%;max-height:210px;object-fit:cover;display:block;filter:brightness(.6);}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 16px var(--cyan);animation:scanDown 2s ease-in-out infinite;}
+@keyframes scanDown{0%{top:0;opacity:1}90%{top:100%;opacity:1}100%{top:100%;opacity:0}}
+.scan-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,229,200,.04),transparent);pointer-events:none;}
+.scan-title{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:2px;margin-bottom:3px;}
+.scan-sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
+.bar-track{height:2px;background:var(--border);border-radius:1px;margin-bottom:4px;}
+.bar-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--red),var(--amber),var(--cyan));border-radius:1px;transition:width .4s ease;box-shadow:0 0 8px var(--cyan);}
+.bar-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:right;margin-bottom:18px;}
+.steps{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.step{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);transition:all .3s;}
+.step.active{color:var(--text);}
+.step.done{color:var(--cyan);}
+.step-dot{width:18px;height:18px;border-radius:50%;border:1px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:all .3s;}
+.step.active .step-dot{animation:stepPulse 1s ease infinite;border-color:var(--red);color:var(--red);}
+.step.done .step-dot{background:var(--cyan);border-color:var(--cyan);color:var(--bg);}
+@keyframes stepPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,59,.4)}50%{box-shadow:0 0 0 5px rgba(255,59,59,0)}}
+.ext-box{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:11px;padding:16px;display:none;animation:fadeUp .4s ease;}
+.ext-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase;margin-bottom:10px;}
+.ext-row{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;animation:fadeUp .3s ease both;}
+.ext-row:last-child{border-bottom:none;}
+.ext-row span:first-child{color:var(--muted);}
+.ext-row.hl{background:rgba(0,229,200,.08);border-radius:6px;padding:7px 8px;margin:2px 0;}
+
+/* RESULTS */
+#resultsScreen{padding:90px 48px 60px;}
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:10px;}
+.source-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;display:flex;align-items:center;gap:6px;}
+.source-tag.real{color:var(--cyan);}
+.source-tag.demo{color:var(--amber);}
+.btn-back{padding:9px 20px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all .2s;}
+.btn-back:hover{border-color:var(--border-bright);background:var(--surface);}
+
+/* VERDICT */
+.verdict{position:relative;border-radius:18px;overflow:hidden;margin-bottom:22px;padding:38px;}
+.verdict.predatory{background:var(--red-dim);border:1px solid rgba(255,59,59,.28);}
+.verdict.warning{background:var(--amber-dim);border:1px solid rgba(245,166,35,.28);}
+.verdict.fair{background:var(--cyan-dim);border:1px solid rgba(0,229,200,.28);}
+.verdict::before,.verdict::after{content:'';position:absolute;width:48px;height:48px;border:1.5px solid;}
+.verdict.predatory::before{top:0;left:0;border-right:none;border-bottom:none;border-color:var(--red);}
+.verdict.predatory::after{bottom:0;right:0;border-left:none;border-top:none;border-color:var(--red);}
+.verdict.warning::before{top:0;left:0;border-right:none;border-bottom:none;border-color:var(--amber);}
+.verdict.warning::after{bottom:0;right:0;border-left:none;border-top:none;border-color:var(--amber);}
+.verdict.fair::before{top:0;left:0;border-right:none;border-bottom:none;border-color:var(--cyan);}
+.verdict.fair::after{bottom:0;right:0;border-left:none;border-top:none;border-color:var(--cyan);}
+.verdict-inner{display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap;}
+.v-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:9px;}
+.verdict.predatory .v-tag{color:var(--red);}
+.verdict.warning .v-tag{color:var(--amber);}
+.verdict.fair .v-tag{color:var(--cyan);}
+.v-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,3.2vw,42px);letter-spacing:1px;margin-bottom:7px;}
+.v-body{font-size:13px;color:var(--muted);line-height:1.75;max-width:450px;font-weight:300;}
+.apr-block{text-align:right;flex-shrink:0;}
+.apr-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:2px;}
+.apr-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(58px,9vw,108px);line-height:1;letter-spacing:-2px;}
+.verdict.predatory .apr-num{color:var(--red);text-shadow:0 0 40px rgba(255,59,59,.3);}
+.verdict.warning .apr-num{color:var(--amber);text-shadow:0 0 40px rgba(245,166,35,.3);}
+.verdict.fair .apr-num{color:var(--cyan);text-shadow:0 0 40px rgba(0,229,200,.3);}
+.apr-unit{font-size:24px;vertical-align:top;margin-top:9px;display:inline-block;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:20px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .2s,transform .2s;}
+.stat:hover{border-color:var(--border-bright);transform:translateY(-2px);}
+.stat-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px;}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;}
+.stat-val.d{color:var(--red);}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.stat-sub.small{font-size:10px;font-family:'DM Mono',monospace;}
+
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;}
+.panel-lbl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;}
+
+/* FLAGS */
+.flag{display:flex;gap:10px;padding:11px 13px;border-radius:9px;margin-bottom:8px;line-height:1.5;border-left:2.5px solid;animation:fadeUp .4s ease both;}
+.flag.red{background:var(--red-dim);border-color:var(--red);}
+.flag.yellow{background:var(--amber-dim);border-color:var(--amber);}
+.flag.green{background:var(--cyan-dim);border-color:var(--cyan);}
+.flag strong{display:block;font-weight:600;font-size:12px;margin-bottom:2px;}
+.flag span{color:var(--muted);font-size:12px;}
+.flag-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+
+/* COMPARE */
+.cmp{margin-bottom:13px;}
+.cmp-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+.cmp-top span:last-child{font-family:'DM Mono',monospace;}
+.cmp-track{height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
+.cmp-bar{height:100%;border-radius:3px;animation:fillBar 1.2s cubic-bezier(.16,1,.3,1) both;transform-origin:left;}
+@keyframes fillBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* PLAIN ENGLISH */
+.pe-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;margin-bottom:20px;}
+.pe-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;margin-bottom:18px;}
+.pe-item{padding:16px 0;border-bottom:1px solid var(--border);}
+.pe-item:last-child{border-bottom:none;padding-bottom:0;}
+.pe-q{font-size:13px;font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.pe-q::before{content:'';width:12px;height:1px;background:var(--red);flex-shrink:0;}
+.pe-a{font-size:13px;color:var(--muted);line-height:1.8;font-weight:300;}
+.pe-a strong{color:var(--text);font-weight:500;}
+
+/* ALTERNATIVES */
+.alts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.alt{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s;position:relative;overflow:hidden;}
+.alt::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(0,229,200,.05),transparent 60%);opacity:0;transition:opacity .3s;}
+.alt:hover{border-color:rgba(0,229,200,.3);transform:translateY(-2px);}
+.alt:hover::before{opacity:1;}
+.alt-name{font-weight:500;font-size:13px;margin-bottom:4px;}
+.alt-apr{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--cyan);letter-spacing:1px;margin-bottom:6px;}
+.alt-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+.alt-link{display:inline-block;margin-top:10px;padding:8px 12px;border-radius:8px;border:1px solid rgba(0,229,200,.35);color:var(--cyan);text-decoration:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;transition:all .2s;}
+.alt-link:hover{background:rgba(0,229,200,.10);border-color:var(--cyan);}
+
+/* CHATBOT */
+.chat-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden;}
+.chat-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.chat-head-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;}
+.chat-head-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:1px;}
+.chat-msgs{height:320px;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:11px;scroll-behavior:smooth;}
+.chat-msgs::-webkit-scrollbar{width:3px;}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px;}
+.msg{max-width:80%;animation:fadeUp .3s ease;}
+.msg.bot{align-self:flex-start;}
+.msg.user{align-self:flex-end;}
+.bubble{padding:11px 14px;border-radius:12px;font-size:13px;line-height:1.65;}
+.msg.bot .bubble{background:rgba(255,255,255,.06);border:1px solid var(--border);border-bottom-left-radius:3px;}
+.msg.user .bubble{background:var(--red);color:#fff;border-bottom-right-radius:3px;}
+.msg-time{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px;}
+.msg.user .msg-time{text-align:right;}
+.dots{display:flex;gap:4px;padding:13px 14px;}
+.dots span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce 1.2s ease infinite;}
+.dots span:nth-child(2){animation-delay:.2s;}
+.dots span:nth-child(3){animation-delay:.4s;}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+.chips{padding:0 18px 12px;display:flex;gap:6px;flex-wrap:wrap;}
+.chip{font-family:'DM Mono',monospace;font-size:10px;padding:5px 11px;border:1px solid var(--border);border-radius:20px;cursor:pointer;color:var(--muted);transition:all .17s;}
+.chip:hover{border-color:var(--cyan);color:var(--cyan);}
+.chat-input-wrap{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;}
+.chat-input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s;}
+.chat-input:focus{border-color:var(--cyan);}
+.chat-send{padding:10px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;}
+.chat-send:hover{background:#e02020;}
+.chat-send:disabled{background:rgba(255,255,255,.1);cursor:not-allowed;}
+
+.disclaimer{padding:13px 16px;border:1px solid var(--border);border-radius:9px;font-size:11px;color:var(--muted);line-height:1.6;font-family:'DM Mono',monospace;margin-bottom:20px;}
+
+/* ERROR TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a24;border:1px solid var(--border-bright);border-radius:10px;padding:12px 20px;font-family:'DM Mono',monospace;font-size:12px;z-index:9000;transition:transform .3s cubic-bezier(.16,1,.3,1);white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.error{border-color:rgba(255,59,59,.4);color:var(--red);}
+
+@media(max-width:900px){
+  nav,#heroScreen,#scanScreen,#resultsScreen{padding-left:20px;padding-right:20px;}
+  .card{position:static;transform:none;width:100%;margin-top:40px;animation:fadeUp .8s ease .8s both;}
+  #heroScreen{flex-direction:column;}
+  .stats,.two-col,.alts{grid-template-columns:1fr;}
+  .verdict-inner{flex-direction:column;}
+  .apr-block{text-align:left;}
+}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<canvas id="bgCanvas"></canvas>
+<div class="toast" id="toast"></div>
+
+<!-- PRIVACY MODAL -->
+<div class="overlay" id="privacyOverlay">
+  <div class="modal">
+    <div class="modal-title">Your Privacy</div>
+    <div class="modal-sub">// Exactly what happens to your data</div>
+    <div class="modal-item">
+      <div class="modal-icon">🔒</div>
+      <div class="modal-text">
+        <strong>Nothing is stored. Ever.</strong>
+        <p>LoanLens has no database. We don't log, save, or sell anything you submit. Your loan data is processed in memory and immediately discarded.</p>
+      </div>
+    </div>
+    <div class="modal-item">
+      <div class="modal-icon">📄</div>
+      <div class="modal-text">
+        <strong>Uploaded documents: Claude AI reads them</strong>
+        <p>When you upload a document, the image is sent to Claude AI to extract the text. It is not stored anywhere after that. Anthropic's privacy policy applies to that processing.</p>
+      </div>
+    </div>
+    <div class="modal-item">
+      <div class="modal-icon">✍️</div>
+      <div class="modal-text">
+        <strong>Manual entry: only numbers, nothing personal</strong>
+        <p>If you type in your loan terms, only those numbers are sent for analysis. No name, no address, no account numbers — just the loan math.</p>
+      </div>
+    </div>
+    <div class="modal-item">
+      <div class="modal-icon">🚫</div>
+      <div class="modal-text">
+        <strong>We do not sell data. We cannot — we don't have any.</strong>
+        <p>Our backend is a stateless proxy. It receives your request, calls Claude, and returns the result. Nothing is written to disk.</p>
+      </div>
+    </div>
+    <button class="modal-close" onclick="document.getElementById('privacyOverlay').classList.remove('open')">Got it — close</button>
+  </div>
+</div>
+
+<nav>
+  <div class="logo"><div class="logo-dot"></div>LOANLENS</div>
+  <button class="privacy-btn" onclick="document.getElementById('privacyOverlay').classList.add('open')">🔒 HOW WE HANDLE YOUR DATA</button>
+</nav>
+
+<!-- SCREEN 1: HERO -->
+<div id="heroScreen" class="screen active">
+  <div class="hero-eyebrow">Free AI Loan Scanner</div>
+  <div class="hero-headline">
+    <span class="hl"><span>SEE</span></span>
+    <span class="hl"><span>THROUGH</span></span>
+    <span class="hl"><span>THE FINE PRINT.</span></span>
+  </div>
+  <p class="hero-sub">Upload a photo of any loan offer. LoanLens uses AI to decode the fine print and tell you <strong>exactly</strong> what you're agreeing to — in plain English, before you sign.</p>
+
+  <div class="card">
+    <div class="card-label">// Analyze a loan — free, no account needed</div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('upload',this)">Upload Doc</button>
+      <button class="tab" onclick="switchTab('manual',this)">Enter Manually</button>
+      <button class="tab" onclick="switchTab('demo',this)">See Demo</button>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div class="tab-panel active" id="tab-upload">
+      <div class="drop-zone" id="dropZone"
+        ondragover="event.preventDefault();this.style.borderColor='var(--red)'"
+        ondragleave="this.style.borderColor=''"
+        ondrop="handleDrop(event)">
+        <input type="file" accept="image/*,.pdf" id="fileInput" onchange="handleFile(this.files[0])">
+        <div class="drop-zone-icon">📄</div>
+        <h3>Drop your loan document here</h3>
+        <p>Photo · Screenshot · Scanned PDF</p>
+      </div>
+      <div style="margin-top:12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.6;">
+        No account. No signup. Nothing stored.<br>
+        <button onclick="document.getElementById('privacyOverlay').classList.add('open')" style="background:none;border:none;color:var(--cyan);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;text-decoration:underline;">See exactly how your data is handled →</button>
+      </div>
+    </div>
+
+    <!-- MANUAL TAB -->
+    <div class="tab-panel" id="tab-manual">
+      <div class="form">
+        <div class="fg">
+          <label>Loan type</label>
+          <select id="m-type">
+            <option value="payday">Payday Loan</option>
+            <option value="auto">Auto Loan</option>
+            <option value="personal" selected>Personal Loan</option>
+            <option value="renttoown">Rent-to-Own</option>
+            <option value="mortgage">Mortgage</option>
+            <option value="student">Student Loan</option>
+            <option value="other">Other / Not Sure</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>State (optional)</label>
+          <select id="m-state">
+            <option value="" selected>Not provided</option>
+            <option value="CA">California</option><option value="TX">Texas</option><option value="FL">Florida</option>
+            <option value="NY">New York</option><option value="IL">Illinois</option><option value="PA">Pennsylvania</option>
+            <option value="OH">Ohio</option><option value="GA">Georgia</option><option value="NC">North Carolina</option>
+            <option value="MI">Michigan</option><option value="NJ">New Jersey</option><option value="VA">Virginia</option>
+            <option value="WA">Washington</option><option value="AZ">Arizona</option><option value="MA">Massachusetts</option>
+            <option value="TN">Tennessee</option><option value="IN">Indiana</option><option value="MO">Missouri</option>
+            <option value="MD">Maryland</option><option value="WI">Wisconsin</option><option value="CO">Colorado</option>
+            <option value="MN">Minnesota</option><option value="SC">South Carolina</option><option value="AL">Alabama</option>
+            <option value="LA">Louisiana</option><option value="KY">Kentucky</option><option value="OR">Oregon</option>
+            <option value="OK">Oklahoma</option><option value="CT">Connecticut</option><option value="UT">Utah</option>
+            <option value="IA">Iowa</option><option value="NV">Nevada</option><option value="AR">Arkansas</option>
+            <option value="MS">Mississippi</option><option value="KS">Kansas</option><option value="NM">New Mexico</option>
+            <option value="NE">Nebraska</option><option value="WV">West Virginia</option><option value="ID">Idaho</option>
+            <option value="HI">Hawaii</option><option value="NH">New Hampshire</option><option value="ME">Maine</option>
+            <option value="MT">Montana</option><option value="RI">Rhode Island</option><option value="DE">Delaware</option>
+            <option value="SD">South Dakota</option><option value="ND">North Dakota</option><option value="AK">Alaska</option>
+            <option value="VT">Vermont</option><option value="WY">Wyoming</option><option value="DC">District of Columbia</option>
+          </select>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Amount borrowing ($)</label><input type="number" id="m-principal" placeholder="e.g. 500"></div>
+          <div class="fg"><label>Total you'll pay back ($)</label><input type="number" id="m-payback" placeholder="e.g. 650"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Loan length</label><input type="number" id="m-term" placeholder="e.g. 12"></div>
+          <div class="fg"><label>Length unit</label>
+            <select id="m-unit">
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months" selected>Months</option>
+              <option value="years">Years</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Monthly payment ($)</label><input type="number" id="m-monthly" placeholder="Optional"></div>
+          <div class="fg"><label>Extra fees ($)</label><input type="number" id="m-fees" placeholder="e.g. 0" value="0"></div>
+        </div>
+        <div class="fg"><label>Lender name (optional)</label><input type="text" id="m-lender" placeholder="e.g. QuickCash Inc."></div>
+        <button class="btn-go" onclick="runManual()">Analyze This Loan →</button>
+      </div>
+    </div>
+
+    <!-- DEMO TAB -->
+    <div class="tab-panel" id="tab-demo">
+      <div class="demos">
+        <button class="demo-btn r" onclick="runDemo('payday')">
+          <span class="demo-icon">🚨</span>
+          <div class="demo-text"><strong>Payday Loan — Predatory</strong><span>$300 · repay $390 in 14 days · ~391% APR</span></div>
+        </button>
+        <button class="demo-btn a" onclick="runDemo('auto')">
+          <span class="demo-icon">🚗</span>
+          <div class="demo-text"><strong>Dealership Auto Loan — Warning</strong><span>$12k · 84 months · $285/mo · hidden markup</span></div>
+        </button>
+        <button class="demo-btn c" onclick="runDemo('renttoown')">
+          <span class="demo-icon">📺</span>
+          <div class="demo-text"><strong>Rent-to-Own — Predatory</strong><span>$499 TV · $65/mo × 18 months = $1,170 total</span></div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 2: SCANNING -->
+<div id="scanScreen" class="screen">
+  <div class="scan-wrap">
+    <div class="scan-frame">
+      <img id="scanImg" src="" alt="">
+      <div class="scan-line"></div>
+      <div class="scan-overlay"></div>
+    </div>
+    <div class="scan-title" id="scanTitle">READING DOCUMENT</div>
+    <div class="scan-sub" id="scanSub">AI is analyzing your loan...</div>
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    <div class="bar-pct" id="barPct">0%</div>
+    <div class="steps" id="stepsEl"></div>
+    <div class="ext-box" id="extBox">
+      <div class="ext-label">// Extracted terms</div>
+      <div id="extRows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: RESULTS -->
+<div id="resultsScreen" class="screen">
+  <div class="results-header">
+    <div class="source-tag" id="sourceTag"></div>
+    <button class="btn-back" onclick="resetApp()">← Analyze Another Loan</button>
+  </div>
+
+  <div class="verdict" id="verdictEl">
+    <div class="verdict-inner">
+      <div>
+        <div class="v-tag" id="vTag"></div>
+        <div class="v-title" id="vTitle"></div>
+        <div class="v-body" id="vBody"></div>
+      </div>
+      <div class="apr-block">
+        <div class="apr-lbl">REAL APR</div>
+        <div class="apr-num"><span id="aprNum">0</span><span class="apr-unit">%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats" id="statsEl"></div>
+
+  <div class="two-col">
+    <div class="panel"><div class="panel-lbl">// Red Flags</div><div id="flagsEl"></div></div>
+    <div class="panel"><div class="panel-lbl">// APR vs Market</div><div id="cmpEl"></div></div>
+  </div>
+
+  <div class="pe-section">
+    <div class="pe-title">IN PLAIN ENGLISH</div>
+    <div id="peEl"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-lbl">// Better Alternatives</div>
+    <div class="alts" id="altsEl"></div>
+  </div>
+
+  <!-- CHATBOT -->
+  <div class="chat-wrap">
+    <div class="chat-head">
+      <div class="chat-head-left">
+        <div class="chat-head-title">ASK ABOUT YOUR LOAN</div>
+        <div class="chat-head-sub">// AI knows your specific loan — ask anything</div>
+      </div>
+    </div>
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="chips" id="chipsEl"></div>
+    <div class="chat-input-wrap">
+      <input class="chat-input" id="chatInput" placeholder="e.g. What happens if I miss a payment?" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="chat-send" id="sendBtn" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <div class="disclaimer">DISCLAIMER: LoanLens is for educational purposes only. Not legal or financial advice. If you've been targeted by predatory lending, contact the CFPB at consumerfinance.gov or call 1-855-411-2372.</div>
+</div>
+
+<script>
+// ── CURSOR ──
+const $cursor=document.getElementById('cursor'),$ring=document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;$cursor.style.left=mx+'px';$cursor.style.top=my+'px';});
+(function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;$ring.style.left=rx+'px';$ring.style.top=ry+'px';requestAnimationFrame(loop);})();
+
+// ── CANVAS BG ──
+const cv=document.getElementById('bgCanvas'),cx=cv.getContext('2d');
+let W,H,pts=[];
+const resize=()=>{W=cv.width=innerWidth;H=cv.height=innerHeight;};
+resize();addEventListener('resize',resize);
+for(let i=0;i<55;i++)pts.push({x:Math.random()*2200,y:Math.random()*1400,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.3+.4,o:Math.random()*.35+.07});
+(function bg(){
+  cx.clearRect(0,0,W,H);
+  cx.strokeStyle='rgba(255,255,255,.017)';cx.lineWidth=1;
+  for(let x=0;x<W;x+=80){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+  for(let y=0;y<H;y+=80){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+  pts.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;
+    if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    cx.fillStyle=`rgba(240,238,232,${p.o})`;cx.fill();
+  });
+  const t=Date.now()/9000;
+  [{x:W*.12+Math.sin(t)*65,y:H*.3+Math.cos(t*.7)*50,c:'255,59,59',r:270},{x:W*.86+Math.cos(t*.75)*50,y:H*.7+Math.sin(t)*65,c:'0,229,200',r:230}]
+  .forEach(o=>{const g=cx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);g.addColorStop(0,`rgba(${o.c},.05)`);g.addColorStop(1,'transparent');cx.fillStyle=g;cx.fillRect(0,0,W,H);});
+  requestAnimationFrame(bg);
+})();
+
+// ── STATE ──
+let chatHistory=[];
+let loanContext='';
+let currentLoanData=null;
+
+// ── TOAST ──
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast '+(type||'');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ── TABS ──
+function switchTab(name,btn){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── SCREENS ──
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── DEMO DATA ──
+const DEMOS={
+  payday:{loanType:'payday',principal:300,totalPayback:390,termLength:14,termUnit:'days',extraFees:0,monthlyPayment:390,lender:'QuickCash USA',
+    state:'TX',extracted:{'Loan Type':'Payday Loan','Principal':'$300.00','Finance Charge':'$90.00','Total of Payments':'$390.00','Due In':'14 days','Lender':'QuickCash USA'}},
+  auto:{loanType:'auto',principal:12000,totalPayback:23940,termLength:84,termUnit:'months',extraFees:800,monthlyPayment:285,lender:'AutoDeal Finance',
+    state:'CA',extracted:{'Type':'Auto Retail Installment','Amount Financed':'$12,000','Monthly Payment':'$285.00','Term':'84 months','Doc Fee':'$800','Lender':'AutoDeal Finance'}},
+  renttoown:{loanType:'renttoown',principal:499,totalPayback:1170,termLength:18,termUnit:'months',extraFees:0,monthlyPayment:65,lender:'RentACenter',
+    state:'FL',extracted:{'Agreement':'Rent-to-Own','Cash Price':'$499.00','Monthly':'$65.00','Term':'18 months','Total Cost':'$1,170.00','Store':'RentACenter'}}
+};
+
+const STEPS=['Detecting document type','Extracting text with AI','Parsing financial terms','Calculating true APR','Generating full analysis'];
+
+function makeImg(label){
+  const c=document.createElement('canvas');c.width=640;c.height=180;
+  const x=c.getContext('2d');
+  x.fillStyle='#0f0f16';x.fillRect(0,0,640,180);
+  x.strokeStyle='rgba(255,255,255,.04)';x.lineWidth=1;
+  for(let i=0;i<640;i+=60){x.beginPath();x.moveTo(i,0);x.lineTo(i,180);x.stroke();}
+  for(let i=0;i<180;i+=36){x.beginPath();x.moveTo(0,i);x.lineTo(640,i);x.stroke();}
+  x.fillStyle='rgba(255,255,255,.7)';x.font='bold 13px monospace';x.fillText(label,26,34);
+  x.fillStyle='rgba(255,255,255,.2)';x.font='12px monospace';
+  ['LOAN AGREEMENT — TERMS AND CONDITIONS','ANNUAL PERCENTAGE RATE (APR)','FINANCE CHARGE','TOTAL OF PAYMENTS','PAYMENT SCHEDULE'].forEach((t,i)=>x.fillText(t,26,62+i*20));
+  x.fillStyle='rgba(255,59,59,.25)';x.fillRect(26,60,118,13);
+  return c.toDataURL();
+}
+
+// ── DEMO FLOW ──
+function runDemo(type){
+  const d=DEMOS[type];
+  startScan(makeImg('📄 '+type.toUpperCase()+' AGREEMENT'),()=>simulateScan(d.extracted,()=>renderResults({...d,isReal:false})));
+}
+
+// ── MANUAL ──
+function runManual(){
+  const p=parseFloat(document.getElementById('m-principal').value)||0;
+  const pay=parseFloat(document.getElementById('m-payback').value)||0;
+  if(!p||!pay){toast('Please enter the loan amount and total payback.','error');return;}
+  const d={
+    loanType:document.getElementById('m-type').value,
+    principal:p,totalPayback:pay,
+    termLength:parseFloat(document.getElementById('m-term').value)||1,
+    termUnit:document.getElementById('m-unit').value,
+    extraFees:parseFloat(document.getElementById('m-fees').value)||0,
+    monthlyPayment:parseFloat(document.getElementById('m-monthly').value)||0,
+    lender:document.getElementById('m-lender').value||'Unknown Lender',
+    state:document.getElementById('m-state').value||''
+  };
+  const extracted={'Loan Type':d.loanType,'Principal':'$'+p.toLocaleString(),'Total Payback':'$'+pay.toLocaleString(),'Term':d.termLength+' '+d.termUnit,'Fees':'$'+d.extraFees,'Lender':d.lender,'State':d.state||'Not provided'};
+  startScan(makeImg('✍️ MANUAL ENTRY'),()=>simulateScan(extracted,()=>callAnalyze(d)));
+}
+
+// ── FILE UPLOAD ──
+function handleDrop(e){e.preventDefault();handleFile(e.dataTransfer.files[0]);}
+function handleFile(file){
+  if(!file)return;
+  const allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+  if(!allowed.includes(file.type)){
+    toast('Unsupported file type. Use PNG, JPG, WEBP, GIF, or PDF.','error');
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const dataUrl=e.target.result;
+    const base64=dataUrl.split(',')[1];
+    const mime=file.type||'image/jpeg';
+    const preview=mime==='application/pdf'?makeImg('📄 PDF DOCUMENT'):dataUrl;
+    startScan(preview,()=>simulateScan({},()=>callExtract(base64,mime)));
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SCAN ANIMATION ──
+function startScan(imgSrc,cb){
+  show('scanScreen');
+  document.getElementById('scanImg').src=imgSrc;
+  document.getElementById('barFill').style.width='0%';
+  document.getElementById('barPct').textContent='0%';
+  document.getElementById('extBox').style.display='none';
+  document.getElementById('extRows').innerHTML='';
+  document.getElementById('stepsEl').innerHTML=STEPS.map((s,i)=>`
+    <div class="step" id="st${i}"><div class="step-dot" id="sd${i}">${i+1}</div>${s}</div>`).join('');
+  markStep(0,'active');
+  cb();
+}
+function markStep(i,state){
+  const el=document.getElementById('st'+i),d=document.getElementById('sd'+i);
+  if(!el)return;el.className='step '+state;if(state==='done')d.textContent='✓';
+}
+function setBar(p){document.getElementById('barFill').style.width=p+'%';document.getElementById('barPct').textContent=Math.round(p)+'%';}
+function simulateScan(extracted,cb){
+  [[400,18,0],[900,36,1,0],[1600,55,2,1,extracted],[2300,74,3,2],[3100,90,4,3],[3700,100,null,4]].forEach(([t,p,s,d,ext])=>
+    setTimeout(()=>{setBar(p);if(d!=null)markStep(d,'done');if(s!=null)markStep(s,'active');if(ext&&Object.keys(ext).length)showExt(ext);},t));
+  setTimeout(cb,4200);
+}
+function showExt(data){
+  const box=document.getElementById('extBox'),rows=document.getElementById('extRows');
+  box.style.display='block';rows.innerHTML='';
+  const important=/apr|rate|finance|payment|principal|total|fee|term|lender|state/i;
+  Object.entries(data).forEach(([k,v],i)=>setTimeout(()=>{
+    const d=document.createElement('div');d.className='ext-row'+(important.test(String(k))?' hl':'');d.style.animationDelay=i*.07+'s';
+    d.innerHTML=`<span>${k}</span><span>${v}</span>`;rows.appendChild(d);
+  },i*100));
+}
+
+// ── API CALLS (to our backend) ──
+async function callExtract(base64,mimeType){
+  try{
+    const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'extract',payload:{imageBase64:base64,mimeType}})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Extraction failed');
+    const txt=data.content?.[0]?.text||'{}';
+    const parsed=parseModelJson(txt);
+    if(parsed.extracted)showExt(parsed.extracted);
+    setTimeout(()=>callAnalyze({...parsed,isReal:true}),600);
+  }catch(e){
+    console.error(e);
+    const msg=/API key/i.test(String(e?.message||''))?'Missing API key. Set ANTHROPIC_API_KEY first.':'Could not read document — try manual entry instead.';
+    toast(msg,'error');
+    setTimeout(()=>show('heroScreen'),2000);
+  }
+}
+
+async function callAnalyze(loanData){
+  const apr=calcAPR(loanData.principal,loanData.totalPayback,loanData.termLength,loanData.termUnit,loanData.extraFees||0);
+  if(loanData.isReal!==false){
+    // Real API call
+    try{
+      const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'analyze',payload:{loanData,apr}})});
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||'Analysis failed');
+      const txt=data.content?.[0]?.text||'{}';
+      const analysis=parseModelJson(txt);
+      renderResults({...loanData,isReal:true,analysis,apr});
+    }catch(e){
+      console.error(e);
+      toast('Using local analysis fallback (AI unavailable).','error');
+      renderResults({...loanData,isReal:true,apr}); // fallback to JS-only results
+    }
+  } else {
+    renderResults({...loanData,isReal:false,apr});
+  }
+}
+
+// ── MATH ──
+function toDays(l,u){return l*({days:1,weeks:7,months:30.44,years:365}[u]||30);}
+function calcAPR(p,pay,tl,tu,fees){return Math.round((pay+fees-p)/p/toDays(tl,tu)*365*100*10)/10;}
+function getVerdict(apr,type){
+  const f={payday:36,auto:12,personal:20,renttoown:30,mortgage:8,student:7,other:25}[type]||25;
+  return apr>f*5?'predatory':apr>f*2?'warning':'fair';
+}
+
+// ── RENDER ──
+function renderResults(d){
+  currentLoanData=d;
+  const p=d.principal||0,pay=d.totalPayback||p,fees=d.extraFees||0;
+  const apr=d.apr||calcAPR(p,pay,d.termLength||14,d.termUnit||'days',fees);
+  const profit=pay+fees-p;
+  const days=toDays(d.termLength||14,d.termUnit||'days');
+  const daily=profit/days;
+  const v=d.analysis?.verdict||getVerdict(apr,d.loanType||'personal');
+  const ai=d.analysis;
+  const quality=calcExtractionQuality(d,ai);
+  loanContext=ai?.chatContext||`${d.loanType} loan. Principal: $${p}. Total payback: $${pay+fees}. Term: ${d.termLength} ${d.termUnit}. APR: ${apr}%. Lender profit: $${profit.toFixed(2)}. Cost/day: $${daily.toFixed(2)}. Verdict: ${v}. Lender: ${d.lender||'Unknown'}. State: ${d.state||'unknown'}. Extraction confidence: ${quality}%.`;
+
+  show('resultsScreen');
+
+  // Source tag
+  const st=document.getElementById('sourceTag');
+  st.className='source-tag '+(d.isReal?'real':'demo');
+  st.textContent=d.isReal?'✓ ANALYZED WITH AI':'⚡ DEMO SCENARIO — UPLOAD A REAL DOC FOR YOUR LOAN';
+
+  // Verdict defaults
+  const vd={
+    predatory:{tag:'🚨 PREDATORY LOAN DETECTED',title:'This loan is designed to trap you.',body:'This lender charges rates that target people in desperate situations. The APR is many times what any legitimate lender charges. You have better options — see below.'},
+    warning:{tag:'⚠️ HIGH-COST LOAN',title:'Proceed with extreme caution.',body:'This loan is significantly more expensive than fair-market alternatives. Review the red flags and consider alternatives before signing anything.'},
+    fair:{tag:'✅ REASONABLE TERMS',title:'This loan appears fair.',body:'The APR is within a reasonable range for this loan type. Still compare alternatives, but this is not a predatory offer.'}
+  }[v];
+  document.getElementById('verdictEl').className='verdict '+v;
+  document.getElementById('vTag').textContent=ai?.verdictTag||vd.tag;
+  document.getElementById('vTitle').textContent=ai?.verdictTitle||vd.title;
+  document.getElementById('vBody').textContent=ai?.verdictBody||vd.body;
+  animCount('aprNum',apr,1400);
+
+  // Stats
+  document.getElementById('statsEl').innerHTML=[
+    {l:'You Borrow',v:'$'+p.toLocaleString(),s:'Principal amount',d:false},
+    {l:'You Pay Back',v:'$'+(pay+fees).toLocaleString(),s:'Total cost',d:true},
+    {l:'Lender Profit',v:'$'+profit.toFixed(0),s:'Off your loan',d:true},
+    {l:'Cost per $100',v:'$'+((profit/p)*100).toFixed(2),s:'That you borrow',d:false},
+    {l:'Extraction Confidence',v:`${quality}%`,s:ai?.missingFields?.length?`Missing: ${ai.missingFields.join(', ')}`:'Core terms detected',d:false,small:true},
+  ].map(s=>`<div class="stat"><div class="stat-lbl">${s.l}</div><div class="stat-val${s.d?' d':''}">${s.v}</div><div class="stat-sub${s.small?' small':''}">${s.s}</div></div>`).join('');
+
+  // Flags
+  const flags=ai?.redFlags||buildFlags(apr,profit,p,d.termLength||14,d.termUnit||'days',d.loanType);
+  document.getElementById('flagsEl').innerHTML=flags.map((f,i)=>
+    `<div class="flag ${f.severity||f.t}" style="animation-delay:${i*.09}s">
+      <div class="flag-icon">${f.icon||f.i}</div>
+      <div><strong>${f.title}</strong><span>${f.detail}</span></div>
+    </div>`).join('');
+
+  // Compare
+  const comps=[
+    {l:'This loan',r:apr,bar:Math.min(apr,600),c:v==='predatory'?'var(--red)':v==='warning'?'var(--amber)':'var(--cyan)'},
+    {l:'Avg credit card',r:24,bar:24,c:'var(--amber)'},
+    {l:'Personal bank loan',r:11,bar:11,c:'var(--cyan)'},
+    {l:'Credit union',r:9,bar:9,c:'var(--cyan)'},
+    {l:'Mortgage',r:6.5,bar:6.5,c:'rgba(0,229,200,.45)'},
+  ];
+  const mx=Math.max(...comps.map(c=>c.bar));
+  document.getElementById('cmpEl').innerHTML=comps.map(c=>
+    `<div class="cmp"><div class="cmp-top"><span>${c.l}</span><span style="color:${c.c}">${c.r>999?c.r.toLocaleString():c.r}%</span></div>
+    <div class="cmp-track"><div class="cmp-bar" style="width:${(c.bar/mx)*100}%;background:${c.c}"></div></div></div>`).join('');
+
+  // Plain English
+  const defPE=[
+    {question:'What are you actually paying?',answer:`You borrow <strong>$${p.toLocaleString()}</strong> and pay back <strong>$${(pay+fees).toLocaleString()}</strong>. That's <strong>$${profit.toFixed(2)} in fees</strong> — pure profit for the lender.`},
+    {question:'How does this compare to normal?',answer:`${apr}% APR. A credit card averages 24%. A mortgage is 6-7%. <strong>This loan costs ${Math.max(1,Math.round(apr/24))}x more than a typical credit card.</strong>`},
+    {question:'What is this costing per day?',answer:`<strong>$${daily.toFixed(2)} every single day</strong> — about <strong>$${(daily/24).toFixed(2)} per hour</strong> from the moment you sign.`},
+    {question:"What if you can't repay on time?",answer:d.loanType==='payday'?`<strong>80% of payday borrowers roll their loan over</strong> — paying a fee just to extend. A $${p} loan can spiral into hundreds in extra fees.`:`Late fees, penalty rates, and credit damage that follows you for years.`}
+  ];
+  document.getElementById('peEl').innerHTML=(ai?.plainEnglish||defPE).map(pe=>
+    `<div class="pe-item"><div class="pe-q">${pe.question}</div><div class="pe-a">${pe.answer}</div></div>`).join('');
+
+  // Alternatives
+  const defAlts={
+    payday:[
+      {name:'Navy Federal PAL Loan',apr:'≤18%',description:'Small-dollar personal loans are significantly cheaper than payday lenders.',url:'https://www.navyfederal.org/loans-cards/personal-loans.html',cta:'View Lower-Rate Option'},
+      {name:'PenFed Personal Loan',apr:'From ~8.99%',description:'Credit-union personal loans can replace high-cost short-term debt.',url:'https://www.penfed.org/personal-loans',cta:'See Current Rates'},
+      {name:'EarnIn Cash Advance',apr:'0%',description:'Paycheck advances can avoid payday APR traps.',url:'https://www.earnin.com/',cta:'Open Provider Site'}
+    ],
+    auto:[
+      {name:'Navy Federal Auto Loan',apr:'Competitive rates',description:'Pre-approval often beats dealership markups.',url:'https://www.navyfederal.org/loans-cards/auto-loans.html',cta:'Check Auto Rates'},
+      {name:'PenFed Auto Loan',apr:'Competitive rates',description:'Credit-union auto financing with no dealer pressure.',url:'https://www.penfed.org/auto',cta:'See Auto Offers'},
+      {name:'LightStream Auto Loan',apr:'Varies by credit',description:'Online lender with straightforward terms.',url:'https://www.lightstream.com/auto-loans',cta:'Visit LightStream'}
+    ],
+    renttoown:[
+      {name:'Affirm',apr:'0%+ options',description:'Point-of-sale financing is often cheaper than rent-to-own contracts.',url:'https://www.affirm.com/',cta:'Compare Financing'},
+      {name:'PayPal Pay Later',apr:'0% short-term option',description:'Buy-now-pay-later options may reduce total cost.',url:'https://www.paypal.com/us/digital-wallet/ways-to-pay/buy-now-pay-later',cta:'Open Pay Later'},
+      {name:'Facebook Marketplace',apr:'0%',description:'Used local purchase can avoid financing entirely.',url:'https://www.facebook.com/marketplace/',cta:'Browse Listings'}
+    ],
+    personal:[
+      {name:'SoFi Personal Loan',apr:'Varies by profile',description:'Unsecured personal loan alternative with transparent pricing.',url:'https://www.sofi.com/personal-loans/',cta:'Check SoFi Rates'},
+      {name:'LendingClub Personal Loan',apr:'Varies by profile',description:'Marketplace personal loans for debt consolidation.',url:'https://www.lendingclub.com/personal-loans',cta:'View Loan Options'},
+      {name:'Upgrade Personal Loan',apr:'Varies by profile',description:'Installment loans with fixed monthly payments.',url:'https://www.upgrade.com/personal-loans/',cta:'Explore Upgrade'}
+    ],
+    mortgage:[
+      {name:'Better Mortgage',apr:'Live quote',description:'Digital pre-approval and rate comparison.',url:'https://better.com/mortgage',cta:'Get Rate Quote'},
+      {name:'Rocket Mortgage',apr:'Live quote',description:'Large lender with online rate tools.',url:'https://www.rocketmortgage.com/',cta:'Check Mortgage Rates'},
+      {name:'Bankrate Mortgage Comparison',apr:'Multiple lenders',description:'Compare offers from several lenders side-by-side.',url:'https://www.bankrate.com/mortgages/mortgage-rates/',cta:'Compare Lenders'}
+    ],
+    other:[
+      {name:'Bankrate Personal Loan Comparison',apr:'Multiple lenders',description:'Rate marketplace for lower-cost borrowing options.',url:'https://www.bankrate.com/loans/personal-loans/rates/',cta:'Compare Personal Loans'},
+      {name:'NerdWallet Loan Comparison',apr:'Multiple lenders',description:'Compare products by credit profile and goals.',url:'https://www.nerdwallet.com/best/loans/personal-loans',cta:'Find Lower Rates'},
+      {name:'Local Credit Union Search',apr:'Often lower',description:'Member-owned lenders usually beat alternative loan rates.',url:'https://mapping.ncua.gov/',cta:'Find a Credit Union'}
+    ]
+  };
+  const alts=normalizeAlternatives(ai?.alternatives,d.loanType,defAlts,d.state);
+  document.getElementById('altsEl').innerHTML=alts.map(a=>
+    `<div class="alt">
+      <div class="alt-name">${a.name}</div>
+      <div class="alt-apr">${a.apr}</div>
+      <div class="alt-desc">${a.description||a.desc||a.d}</div>
+      <a class="alt-link" href="${a.url}" target="_blank" rel="noopener noreferrer">${a.cta||'View Offer'}</a>
+    </div>`).join('');
+
+  // Chat
+  initChat(apr,profit,daily,v);
+}
+
+// ── FLAGS (fallback) ──
+function buildFlags(apr,profit,p,tl,tu,type){
+  const flags=[],pct=(profit/p)*100;
+  if(apr>200)flags.push({severity:'red',icon:'🚩',title:`${apr}% APR — ${Math.round(apr/36)}x the 36% fair-lending limit`,detail:'36% APR is the maximum non-predatory rate recognized by most consumer advocates and state laws.'});
+  else if(apr>36)flags.push({severity:'yellow',icon:'⚠️',title:`${apr}% APR exceeds fair-lending threshold`,detail:'Many states cap consumer loans at 36%.'});
+  if(pct>50)flags.push({severity:'red',icon:'🚩',title:`Lender profits ${Math.round(pct)}% of what you borrow`,detail:`For every $100 borrowed, you pay $${pct.toFixed(0)} in interest and fees.`});
+  if(toDays(tl,tu)<30&&type==='payday')flags.push({severity:'red',icon:'🚩',title:'Short term creates rollover trap',detail:'80% of payday loans roll over, creating a cycle. One loan becomes months of fees.'});
+  if(type==='renttoown')flags.push({severity:'red',icon:'🚩',title:'Total far exceeds retail price',detail:'Rent-to-own rarely shows APR. Final cost is typically 2–3x the retail price.'});
+  if(!flags.length)flags.push({severity:'green',icon:'✓',title:'No major red flags detected',detail:'Terms appear within normal market ranges for this loan type.'});
+  return flags;
+}
+
+// ── CHATBOT ──
+function initChat(apr,profit,daily,verdict){
+  chatHistory=[];
+  document.getElementById('chatMsgs').innerHTML='';
+  addBot(`I've analyzed your loan. The real APR is <strong>${apr}%</strong> — the lender makes <strong>$${profit.toFixed(2)}</strong> off you, or <strong>$${daily.toFixed(2)}/day</strong>. Ask me anything about this loan.`);
+  document.getElementById('chipsEl').innerHTML=[
+    'What happens if I miss a payment?','Can I refinance later?','Is this legal where I live?','How do I get out of this?','What\'s the cheapest way to pay off?'
+  ].map(s=>`<button class="chip" onclick="quickAsk('${s.replace(/'/g,"\\'")}')">${s}</button>`).join('');
+}
+
+function addBot(html){
+  const m=document.getElementById('chatMsgs');
+  const d=document.createElement('div');d.className='msg bot';
+  d.innerHTML=`<div class="bubble">${html}</div><div class="msg-time">LoanLens AI</div>`;
+  m.appendChild(d);m.scrollTop=m.scrollHeight;
+}
+function addUser(text){
+  const m=document.getElementById('chatMsgs');
+  const d=document.createElement('div');d.className='msg user';
+  d.innerHTML=`<div class="bubble">${text}</div><div class="msg-time">You</div>`;
+  m.appendChild(d);m.scrollTop=m.scrollHeight;
+}
+function addTyping(){
+  const m=document.getElementById('chatMsgs');
+  const d=document.createElement('div');d.className='msg bot';d.id='typing';
+  d.innerHTML=`<div class="bubble"><div class="dots"><span></span><span></span><span></span></div></div>`;
+  m.appendChild(d);m.scrollTop=m.scrollHeight;
+}
+function removeTyping(){const e=document.getElementById('typing');if(e)e.remove();}
+
+function quickAsk(text){document.getElementById('chatInput').value=text;sendChat();}
+
+async function sendChat(){
+  const inp=document.getElementById('chatInput');
+  const text=inp.value.trim();if(!text)return;
+  inp.value='';
+  addUser(text);
+  document.getElementById('sendBtn').disabled=true;
+  addTyping();
+  chatHistory.push({role:'user',content:text});
+  try{
+    const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'chat',payload:{messages:chatHistory,loanContext}})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||data.detail||'Chat failed');
+    const reply=data.content?.[0]?.text||'Sorry, I had trouble with that. Try again.';
+    chatHistory.push({role:'assistant',content:reply});
+    removeTyping();addBot(reply);
+  }catch(e){
+    const msg=/API key/i.test(String(e?.message||''))?'Chat needs API key setup (`ANTHROPIC_API_KEY`).':'Sorry, something went wrong. Please try again.';
+    removeTyping();addBot(msg);
+  }
+  document.getElementById('sendBtn').disabled=false;
+}
+
+// ── UTILS ──
+function parseModelJson(raw){
+  const cleaned=String(raw||'').replace(/```json|```/gi,'').trim();
+  try{return JSON.parse(cleaned);}catch(_){}
+  const first=cleaned.indexOf('{');
+  const last=cleaned.lastIndexOf('}');
+  if(first!==-1&&last!==-1&&last>first){
+    return JSON.parse(cleaned.slice(first,last+1));
+  }
+  throw new Error('Invalid AI JSON response');
+}
+function normalizeAlternatives(aiAlternatives,loanType,defaults,state){
+  const fallback=defaults[loanType]||defaults.other;
+  const stateUrl=state?`https://www.consumerfinance.gov/ask-cfpb/search/?query=${encodeURIComponent(state+' loan')}`:'https://www.consumerfinance.gov/ask-cfpb/';
+  const stateSpecific={
+    name:`${state||'State'} lending rights`,
+    apr:'Rules & protections',
+    description:'Official consumer-protection guidance and complaint pathways for your local context.',
+    url:stateUrl,
+    cta:'Know Your Rights'
+  };
+  const base=(!Array.isArray(aiAlternatives)||!aiAlternatives.length)?fallback:aiAlternatives.map((a,i)=>{
+    const fb=fallback[i%fallback.length];
+    return {
+      name:a.name||fb.name,
+      apr:a.apr||fb.apr,
+      description:a.description||a.desc||a.d||fb.description,
+      url:a.url||fb.url,
+      cta:a.cta||fb.cta
+    };
+  });
+  return [stateSpecific,...base].slice(0,4);
+}
+function calcExtractionQuality(d,ai){
+  if(typeof ai?.extractionConfidence==='number'){
+    return Math.max(0,Math.min(100,Math.round(ai.extractionConfidence)));
+  }
+  const required=['principal','totalPayback','termLength','termUnit','loanType'];
+  let present=0;
+  required.forEach(k=>{if(d[k]!==undefined&&d[k]!==null&&String(d[k]).trim()!=='')present++;});
+  return Math.round((present/required.length)*100);
+}
+function animCount(id,target,dur){
+  const el=document.getElementById(id);if(!el)return;
+  let s=null;
+  (function step(ts){if(!s)s=ts;const p=Math.min((ts-s)/dur,1);el.textContent=Math.round(p*target);if(p<1)requestAnimationFrame(step);})(performance.now());
+}
+function resetApp(){chatHistory=[];loanContext='';currentLoanData=null;show('heroScreen');document.getElementById('fileInput').value='';}
+</script>
+</body>
+</html>
